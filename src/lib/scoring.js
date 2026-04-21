@@ -1,34 +1,64 @@
-export const CLAVE = {
-    1:'c',2:'b',3:'d',4:'b',5:'b',6:'b',7:'b',8:'b',9:'c',10:'c',
-    11:'a',12:'c',13:'d',14:'d',15:'d',16:'d',17:'b',18:'d',19:'c',
-    20:'b',21:'a',22:'a',23:'a',24:'d',25:'b',26:'c',27:'a',28:'c',
-    29:'a',30:'d'
-  }
-  
-  export const AREAS = {
-    A: { nombre:'Habilidad en Supervisión',                      reactivos:[2,3,16,18,24,30],  escala:[0,17,34,50,67,84,100] },
-    B: { nombre:'Capacidad de Decisión en Relaciones Humanas',   reactivos:[4,6,20,23,29],     escala:[0,20,40,60,80,100] },
-    C: { nombre:'Evaluación de Problemas Interpersonales',       reactivos:[7,9,12,14,19,21,26,27], escala:[0,13,25,38,50,63,75,88,100] },
-    D: { nombre:'Habilidad para Establecer Relaciones',          reactivos:[1,10,11,13,25],    escala:[0,20,40,60,80,100] },
-    E: { nombre:'Sentido Común y Tacto',                         reactivos:[5,8,15,17,22,28],  escala:[0,17,34,50,67,84,100] },
-  }
-  
-  export function calcularScores(respuestas) {
-    const scores = {}
-    let totalAciertos = 0
-    let totalReactivos = 0
-  
-    for (const [letra, area] of Object.entries(AREAS)) {
-      let aciertos = 0
-      for (const num of area.reactivos) {
-        if (respuestas[num] === CLAVE[num]) aciertos++
-      }
-      const pct = area.escala[aciertos]
-      scores[letra] = { aciertos, pct, nombre: area.nombre }
-      totalAciertos += aciertos
-      totalReactivos += area.reactivos.length
+import { mossAreas, mossKey } from '../data/moss'
+
+export const CLAVE = mossKey
+export const AREAS = mossAreas
+
+export function scoreMoss(answers) {
+  const scores = {}
+  let totalHits = 0
+  let totalQuestions = 0
+
+  for (const [code, area] of Object.entries(mossAreas)) {
+    let hits = 0
+    for (const questionNumber of area.questions) {
+      if (answers[String(questionNumber)] === mossKey[questionNumber]) hits += 1
     }
-  
-    scores.total = Math.round((totalAciertos / totalReactivos) * 100)
-    return scores
+    scores[code] = {
+      hits,
+      pct: area.scale[hits] ?? 0,
+      name: area.name,
+    }
+    totalHits += hits
+    totalQuestions += area.questions.length
   }
+
+  return {
+    type: 'percent',
+    total: Math.round((totalHits / totalQuestions) * 100),
+    hits: totalHits,
+    totalQuestions,
+    areas: scores,
+  }
+}
+
+export function scoreGeneric(test, answers) {
+  if (test.code === 'moss') return scoreMoss(answers)
+
+  const answerKey = test.key || {}
+  const keyEntries = Object.entries(answerKey)
+  if (!keyEntries.length) {
+    return {
+      type: 'raw',
+      total: Object.keys(answers).length,
+      answered: Object.keys(answers).length,
+      message: 'Resultado capturado. Falta configurar clave/baremos para interpretacion automatica.',
+      areas: {},
+    }
+  }
+
+  const hits = keyEntries.filter(([number, correct]) => answers[String(number)] === correct).length
+  return {
+    type: 'percent',
+    total: Math.round((hits / keyEntries.length) * 100),
+    hits,
+    totalQuestions: keyEntries.length,
+    areas: {},
+  }
+}
+
+export function resultLevel(score) {
+  if (score >= 80) return { label: 'Alto', color: 'good' }
+  if (score >= 60) return { label: 'Adecuado', color: 'good' }
+  if (score >= 40) return { label: 'Medio', color: 'warn' }
+  return { label: 'Bajo', color: 'danger' }
+}
