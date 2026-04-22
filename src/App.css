@@ -1,6 +1,7 @@
 .app-shell {
   min-height: 100vh;
   width: 100%;
+  box-sizing: border-box;
   padding: 32px;
   background:
     linear-gradient(140deg, rgba(35, 87, 86, 0.18), transparent 34%),
@@ -15,8 +16,13 @@
 }
 
 .app-shell.narrow {
+  width: 100%;
   max-width: 980px;
   margin: 0 auto;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 .topbar,
@@ -207,12 +213,40 @@ input {
   outline: none;
 }
 
+textarea,
+select {
+  width: 100%;
+  border: 1px solid rgba(255, 250, 240, 0.15);
+  border-radius: 8px;
+  background: rgba(7, 10, 13, 0.45);
+  color: #fffaf0;
+  font: inherit;
+  padding: 10px 12px;
+  outline: none;
+}
+
+textarea {
+  min-height: 92px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+textarea:focus,
+select:focus {
+  border-color: rgba(111, 208, 186, 0.8);
+}
+
 input:focus {
   border-color: rgba(111, 208, 186, 0.8);
 }
 
 .error {
   color: #ff9b8e;
+  font-size: 13px;
+}
+
+.success {
+  color: #6fd0ba;
   font-size: 13px;
 }
 
@@ -247,6 +281,15 @@ input:focus {
   background: rgba(255, 255, 255, 0.04);
   color: #f4f1ea;
   text-align: left;
+}
+
+.test-picker strong,
+.test-picker span,
+.test-card h2,
+.test-card p,
+dd,
+code {
+  overflow-wrap: anywhere;
 }
 
 .test-picker .selected {
@@ -346,7 +389,7 @@ td span {
 }
 
 .cards {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .test-card {
@@ -354,10 +397,55 @@ td span {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  width: 100%;
+  color: #f4f1ea;
+  font: inherit;
+  text-align: left;
 }
 
 .test-card h2 {
   margin: 14px 0 8px;
+}
+
+.test-card.selected {
+  border-color: rgba(111, 208, 186, 0.7);
+  background: rgba(111, 208, 186, 0.12);
+}
+
+.tests-admin {
+  display: grid;
+  gap: 18px;
+}
+
+.test-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 18px;
+  align-items: start;
+}
+
+.preview-panel {
+  min-width: 0;
+}
+
+.preview-questions {
+  max-height: 72vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.test-editor {
+  position: sticky;
+  top: 18px;
+  min-width: 0;
+}
+
+.json-field textarea {
+  min-height: 360px;
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 12px;
+  white-space: pre;
+  overflow: auto;
 }
 
 dl {
@@ -411,12 +499,14 @@ dd {
 
 .question {
   padding: 18px;
+  min-width: 0;
 }
 
 .question p {
   color: #f7efe3;
   font-size: 15px;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .question p span {
@@ -440,6 +530,11 @@ dd {
   background: rgba(255, 255, 255, 0.03);
   color: #d9d2c5;
   text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.question button b {
+  flex: 0 0 auto;
 }
 
 .question button.selected {
@@ -454,7 +549,7 @@ dd {
 
 .ranking-options label {
   display: grid;
-  grid-template-columns: 28px 1fr 92px;
+  grid-template-columns: 28px minmax(0, 1fr) 92px;
   gap: 10px;
   align-items: center;
   padding: 12px;
@@ -462,6 +557,10 @@ dd {
   background: rgba(255, 255, 255, 0.03);
   color: #d9d2c5;
   border-radius: 8px;
+}
+
+.ranking-options span {
+  overflow-wrap: anywhere;
 }
 
 .ranking-options b {
@@ -582,7 +681,7 @@ dd {
 
 .answer-review {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
   gap: 8px;
 }
 
@@ -593,6 +692,8 @@ dd {
   border: 1px solid rgba(255, 250, 240, 0.1);
   border-radius: 8px;
   color: #d9d2c5;
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 
 .answer-review strong {
@@ -630,8 +731,13 @@ dd {
 
 @media (max-width: 1100px) {
   .dashboard-grid,
-  .cards {
+  .cards,
+  .test-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .test-editor {
+    position: static;
   }
 }
 
@@ -660,7 +766,15 @@ dd {
     grid-column: auto;
   }
 
+  .ranking-options label {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .ranking-options select {
+    grid-column: 1 / -1;
+  }
+
   .answer-review {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
   }
 }

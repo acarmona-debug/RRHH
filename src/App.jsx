@@ -172,6 +172,7 @@ function Dashboard({ auth }) {
   const [active, setActive] = useState('applications')
   const [form, setForm] = useState({ candidate_name: '', candidate_email: '', position: '', tests: ['moss'] })
   const [newLink, setNewLink] = useState('')
+  const [copiedLink, setCopiedLink] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const canAdmin = auth.profile?.role === 'admin'
@@ -229,10 +230,24 @@ function Dashboard({ auth }) {
         .map((test) => ({ application_id: created.id, test_id: test.id, status: 'pending' }))
       await supabase.from('application_tests').insert(selectedRows)
       setNewLink(publicLink(`/apply/${applicationToken}`))
+      setCopiedLink(false)
       setForm({ candidate_name: '', candidate_email: '', position: '', tests: ['moss'] })
       await fetchAll()
     }
     setBusy(false)
+  }
+
+  async function copyNewLink() {
+    if (!newLink) return
+    await navigator.clipboard.writeText(newLink)
+    setCopiedLink(true)
+    setTimeout(() => setCopiedLink(false), 1800)
+  }
+
+  async function saveTest(testId, patch) {
+    const { error } = await supabase.from('tests').update(patch).eq('id', testId)
+    if (error) throw error
+    await fetchAll()
   }
 
   async function updateStatus(id, status) {
@@ -291,7 +306,7 @@ function Dashboard({ auth }) {
             {newLink && (
               <div className="link-box">
                 <code>{newLink}</code>
-                <button type="button" className="ghost" onClick={() => navigator.clipboard.writeText(newLink)}>Copiar</button>
+                <button type="button" className="ghost" onClick={copyNewLink}>{copiedLink ? 'Copiado' : 'Copiar'}</button>
               </div>
             )}
           </form>
@@ -300,7 +315,7 @@ function Dashboard({ auth }) {
         </div>
       )}
 
-      {active === 'tests' && <TestsPanel tests={tests} />}
+      {active === 'tests' && <TestsPanel tests={tests} canAdmin={canAdmin} onSave={saveTest} />}
       {active === 'users' && canAdmin && <UsersPanel users={users} />}
     </Shell>
   )
@@ -350,15 +365,76 @@ function ApplicationTable({ apps, onArchive, onRestore, onDelete }) {
           </tbody>
         </table>
       </div>
+
     </section>
   )
 }
 
-function TestsPanel({ tests }) {
+function TestsPanel({ tests, canAdmin, onSave }) {
+  const [selectedCode, setSelectedCode] = useState(tests[0]?.code || '')
+  const selected = tests.find((test) => test.code === selectedCode) || tests[0]
+  const [draft, setDraft] = useState(null)
+  const [jsonText, setJsonText] = useState('')
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (!selected) return
+    setDraft({
+      name: selected.name || '',
+      category: selected.category || '',
+      description: selected.description || '',
+      source: selected.source || '',
+      status: selected.status || 'draft',
+      durationMinutes: selected.durationMinutes || 0,
+    })
+    setJsonText(JSON.stringify({
+      questions: selected.questions || [],
+      answer_key: selected.key || {},
+      areas: selected.areas || {},
+    }, null, 2))
+    setMessage('')
+  }, [selected])
+
+  async function submit(event) {
+    event.preventDefault()
+    if (!selected?.id || !draft) {
+      setMessage('Esta evaluación sólo está en memoria local; sincronízala en la base para editarla.')
+      return
+    }
+
+    setSaving(true)
+    setMessage('')
+    try {
+      const parsed = JSON.parse(jsonText)
+      const questions = Array.isArray(parsed.questions) ? parsed.questions : []
+      await onSave(selected.id, {
+        name: draft.name.trim(),
+        category: draft.category.trim(),
+        description: draft.description.trim(),
+        source: draft.source.trim(),
+        status: draft.status,
+        duration_minutes: Number(draft.durationMinutes) || 0,
+        question_count: questions.length,
+        questions,
+        answer_key: parsed.answer_key || {},
+        areas: parsed.areas || {},
+      })
+      setMessage('Guardado')
+    } catch (error) {
+      setMessage(`No se pudo guardar: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!selected) return <section className="message"><h1>Sin evaluaciones</h1><p>No hay evaluaciones configuradas.</p></section>
+
   return (
-    <section className="cards">
+    <section className="tests-admin">
+      <div className="cards">
       {tests.map((test) => (
-        <article className="test-card" key={test.code}>
+        <button className={`test-card ${selected.code === test.code ? 'selected' : ''}`} key={test.code} onClick={() => setSelectedCode(test.code)}>
           <div>
             <span className={`pill ${test.status}`}>{test.status === 'active' ? 'Activo' : 'En captura'}</span>
             <h2>{test.name}</h2>
@@ -369,8 +445,55 @@ function TestsPanel({ tests }) {
             <div><dt>Reactivos</dt><dd>{test.questionCount || test.questions?.length || 'Pendiente'}</dd></div>
             <div><dt>Fuente</dt><dd>{test.source || 'Base de datos'}</dd></div>
           </dl>
-        </article>
+        </button>
       ))}
+      </div>
+
+      <div className="test-workspace">
+        <section className="panel preview-panel">
+          <div className="section-head">
+            <div>
+              <h2>{selected.name}</h2>
+              <p>{selected.description}</p>
+            </div>
+            <span className={`pill ${selected.status}`}>{selected.status}</span>
+          </div>
+          <div className="questions preview-questions">
+            {selected.questions?.map((question) => (
+              <Question key={question.n} question={question} value="" onChange={() => {}} />
+            ))}
+            {!selected.questions?.length && <p className="empty">Esta evaluación no tiene reactivos capturados.</p>}
+          </div>
+        </section>
+
+        {canAdmin && draft && (
+          <form className="panel test-editor" onSubmit={submit}>
+            <div className="section-head">
+              <div>
+                <h2>Edición admin</h2>
+                <p>Actualiza metadatos y estructura JSON de la evaluación seleccionada.</p>
+              </div>
+            </div>
+            <div className="form-grid">
+              <label>Nombre<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required /></label>
+              <label>Categoría<input value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} required /></label>
+              <label>Duración<input value={draft.durationMinutes} onChange={(event) => setDraft({ ...draft, durationMinutes: event.target.value })} type="number" min="0" /></label>
+              <label>Estado
+                <select value={draft.status} onChange={(event) => setDraft({ ...draft, status: event.target.value })}>
+                  <option value="active">Activo</option>
+                  <option value="draft">En captura</option>
+                  <option value="archived">Archivado</option>
+                </select>
+              </label>
+              <label className="span-2">Fuente<input value={draft.source} onChange={(event) => setDraft({ ...draft, source: event.target.value })} /></label>
+              <label className="span-2">Descripción<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} rows="3" /></label>
+              <label className="span-2 json-field">JSON<textarea value={jsonText} onChange={(event) => setJsonText(event.target.value)} rows="18" spellCheck="false" /></label>
+            </div>
+            {message && <p className={message === 'Guardado' ? 'success' : 'error'}>{message}</p>}
+            <button className="primary" disabled={saving}>{saving ? 'Guardando...' : 'Guardar evaluación'}</button>
+          </form>
+        )}
+      </div>
     </section>
   )
 }
