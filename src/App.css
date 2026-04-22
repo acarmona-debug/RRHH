@@ -549,7 +549,7 @@ dd {
 
 .ranking-options label {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) 92px;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(172px, auto);
   gap: 10px;
   align-items: center;
   padding: 12px;
@@ -568,13 +568,31 @@ dd {
   font-family: "DM Mono", ui-monospace, monospace;
 }
 
-.ranking-options select {
-  min-height: 40px;
+.rank-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  gap: 6px;
+  margin: 0;
+}
+
+.rank-buttons button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
   border: 1px solid rgba(255, 250, 240, 0.14);
   border-radius: 8px;
-  background: #1d2428;
-  color: #f7efe3;
-  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #d9d2c5;
+  font-weight: 800;
+  padding: 0;
+  text-align: center;
+}
+
+.rank-buttons button.selected {
+  border-color: rgba(111, 208, 186, 0.78);
+  background: rgba(111, 208, 186, 0.18);
+  color: #edfffa;
 }
 
 .rating-question input[type="range"] {
@@ -770,8 +788,13 @@ dd {
     grid-template-columns: 24px minmax(0, 1fr);
   }
 
-  .ranking-options select {
+  .rank-buttons {
     grid-column: 1 / -1;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .rank-buttons button {
+    width: 100%;
   }
 
   .answer-review {

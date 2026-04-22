@@ -619,6 +619,12 @@ function Question({ question, value, onChange }) {
   if (question.type === 'ranking') {
     const selected = value || {}
     const ranks = Array.from({ length: question.options.length }, (_, index) => index + 1)
+    function selectRank(letter, rank) {
+      const next = Object.fromEntries(Object.entries(selected).filter(([, item]) => Number(item) !== rank))
+      if (Number(selected[letter]) !== rank) next[letter] = rank
+      onChange(next)
+    }
+
     return (
       <article className="question">
         <p><span>{question.n}.</span>{question.text}</p>
@@ -629,10 +635,18 @@ function Question({ question, value, onChange }) {
               <label key={letter}>
                 <b>{letter})</b>
                 <span>{option.text || option}</span>
-                <select value={selected[letter] || ''} onChange={(event) => onChange({ ...selected, [letter]: Number(event.target.value) })}>
-                  <option value="">Orden</option>
-                  {ranks.map((rank) => <option key={rank} value={rank}>{rank}</option>)}
-                </select>
+                <div className="rank-buttons">
+                  {ranks.map((rank) => (
+                    <button
+                      key={rank}
+                      type="button"
+                      className={Number(selected[letter]) === rank ? 'selected' : ''}
+                      onClick={() => selectRank(letter, rank)}
+                    >
+                      {rank}
+                    </button>
+                  ))}
+                </div>
               </label>
             )
           })}
