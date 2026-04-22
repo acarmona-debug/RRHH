@@ -41,7 +41,7 @@ export const mossKey = {
 export const mossAreas = {
   A: { name: 'Habilidad en supervision', questions: [2, 3, 16, 18, 24, 30], scale: [0, 17, 34, 50, 67, 84, 100] },
   B: { name: 'Capacidad de decision en relaciones humanas', questions: [4, 6, 20, 23, 29], scale: [0, 20, 40, 60, 80, 100] },
-  C: { name: 'Evaluacion de problemas interpersonales', questions: [7, 9, 12, 14, 19, 21, 26, 27], scale: [0, 13, 25, 38, 50, 63, 75, 88, 100] },
+  C: { name: 'Evaluación de problemas interpersonales', questions: [7, 9, 12, 14, 19, 21, 26, 27], scale: [0, 13, 25, 38, 50, 63, 75, 88, 100] },
   D: { name: 'Habilidad para establecer relaciones', questions: [1, 10, 11, 13, 25], scale: [0, 20, 40, 60, 80, 100] },
   E: { name: 'Sentido comun y tacto', questions: [5, 8, 15, 17, 22, 28], scale: [0, 17, 34, 50, 67, 84, 100] },
 }

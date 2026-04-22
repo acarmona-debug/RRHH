@@ -797,7 +797,7 @@ function formatAnswer(question, selected) {
 }
 
 function buildInterpretation(test, score) {
-  if (test.code !== 'moss') return score.message || 'Resultado capturado para revision de RRHH.'
+  if (test.code !== 'moss') return score.message || 'Resultado capturado para revisión de RRHH.'
   const level = resultLevel(score.total).label.toLowerCase()
   return `Resultado ${level} en Test de Moss (${score.total}%). Revise las áreas específicas para decidir entrevista, referencias y ajuste al puesto.`
 }

@@ -45,8 +45,8 @@ export const localTests = [
   },
   {
     code: '360-lider',
-    name: 'Evaluacion 360 lider',
-    category: 'Desempeno',
+    name: 'Evaluación 360 líder',
+    category: 'Desempeño',
     description: 'Evaluación 360 a líderes en escala 0 a 10 capturada desde Recursos/un examen.',
     durationMinutes: 30,
     questionCount: 40,
