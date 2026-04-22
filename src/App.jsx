@@ -726,8 +726,9 @@ function Results({ review }) {
 
 function ResultCard({ item, review }) {
   const test = normalizeTest(item.tests)
-  const result = item.results?.[0]
-  const response = item.responses?.[0]
+  // PostgREST/Supabase puede embeder relaciones 1:1 como objeto (no como arreglo).
+  const result = Array.isArray(item.results) ? item.results[0] : item.results
+  const response = Array.isArray(item.responses) ? item.responses[0] : item.responses
   const payload = result?.score_payload
   const level = resultLevel(result?.score_total || 0)
 
@@ -738,7 +739,11 @@ function ResultCard({ item, review }) {
           <h2>{test.name}</h2>
           <p>{test.category}</p>
         </div>
-        {result ? <span className={`score ${level.color}`}>{result.score_total}</span> : <span className="pill pending">Pendiente</span>}
+        {result
+          ? <span className={`score ${level.color}`}>{result.score_total}</span>
+          : item.status === 'completed'
+            ? <span className="pill completed">Completado</span>
+            : <span className="pill pending">Pendiente</span>}
       </div>
       {result && (
         <>
