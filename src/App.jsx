@@ -21,6 +21,14 @@ function publicLink(path) {
   return `${base}#${path}`
 }
 
+function withTimeout(promise, message, ms = 10000) {
+  let timeoutId
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId))
+}
+
 function useAuth() {
   const [state, setState] = useState({ loading: true, session: null, profile: null })
 
@@ -29,7 +37,11 @@ function useAuth() {
 
     async function loadProfile(session) {
       if (!session?.user) return null
-      const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+      const { data, error } = await withTimeout(
+        supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle(),
+        'Tiempo agotado al cargar el perfil.'
+      )
+      if (error) console.warn('No se pudo cargar el perfil:', error.message)
       if (data) return data
       const fallback = {
         id: session.user.id,
@@ -37,20 +49,40 @@ function useAuth() {
         full_name: session.user.user_metadata?.full_name || session.user.email,
         role: 'rrhh',
       }
-      await supabase.from('profiles').insert(fallback)
+      await withTimeout(supabase.from('profiles').insert(fallback).throwOnError(), 'Tiempo agotado al crear el perfil.')
       return fallback
     }
 
     async function boot() {
-      const { data } = await supabase.auth.getSession()
-      const profile = await loadProfile(data.session)
-      if (mounted) setState({ loading: false, session: data.session, profile })
+      try {
+        const { data } = await withTimeout(supabase.auth.getSession(), 'Tiempo agotado al cargar la sesión.')
+        if (!mounted) return
+        setState({ loading: false, session: data.session, profile: null })
+        if (data.session) {
+          const profile = await loadProfile(data.session)
+          if (mounted) setState({ loading: false, session: data.session, profile })
+        }
+      } catch (error) {
+        console.warn('No se pudo iniciar la sesión:', error.message)
+        if (mounted) setState({ loading: false, session: null, profile: null })
+      }
     }
 
     boot()
-    const { data: subscription } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const profile = await loadProfile(session)
-      if (mounted) setState({ loading: false, session, profile })
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return
+      setState({ loading: false, session, profile: null })
+      if (!session) return
+
+      setTimeout(async () => {
+        try {
+          const profile = await loadProfile(session)
+          if (mounted) setState({ loading: false, session, profile })
+        } catch (error) {
+          console.warn('No se pudo cargar el perfil:', error.message)
+          if (mounted) setState({ loading: false, session, profile: null })
+        }
+      }, 0)
     })
 
     return () => {
@@ -63,7 +95,7 @@ function useAuth() {
 }
 
 function Protected({ auth, children }) {
-  if (auth.loading) return <Shell center><Loader text="Cargando sesion..." /></Shell>
+  if (auth.loading) return <Shell center><Loader text="Cargando sesión..." /></Shell>
   if (!auth.session) return <Navigate to="/login" replace />
   return children
 }
@@ -97,16 +129,24 @@ function Login({ auth }) {
     event.preventDefault()
     setBusy(true)
     setError('')
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
-    if (authError) setError('No se pudo iniciar sesion. Revisa correo y contrasena.')
-    setBusy(false)
+    try {
+      const { error: authError } = await withTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        'Tiempo agotado al validar credenciales.'
+      )
+      if (authError) setError('No se pudo iniciar sesión. Revisa correo y contraseña.')
+    } catch (loginError) {
+      setError(`No se pudo iniciar sesión: ${loginError.message}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
     <Shell center>
       <form className="login-card" onSubmit={submit}>
         <div>
-          <p className="eyebrow">Psicometricos UUC</p>
+          <p className="eyebrow">Psicométricos UUC</p>
           <h1>Acceso interno</h1>
           <p className="muted">Ingresa con tu cuenta de administrador o RRHH.</p>
         </div>
@@ -115,7 +155,7 @@ function Login({ auth }) {
           <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" autoComplete="email" required />
         </label>
         <label>
-          Contrasena
+          Contraseña
           <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" autoComplete="current-password" required />
         </label>
         {error && <p className="error">{error}</p>}
@@ -201,7 +241,7 @@ function Dashboard({ auth }) {
   }
 
   async function removeApplication(id) {
-    if (!confirm('Eliminar esta aplicacion y sus resultados?')) return
+    if (!confirm('¿Eliminar esta aplicación y sus resultados?')) return
     await supabase.from('applications').delete().eq('id', id)
     await fetchAll()
   }
@@ -210,8 +250,8 @@ function Dashboard({ auth }) {
     <Shell>
       <header className="topbar">
         <div>
-          <p className="eyebrow">Panel de aplicacion</p>
-          <h1>Psicometricos UUC</h1>
+          <p className="eyebrow">Panel de aplicación</p>
+          <h1>Psicométricos UUC</h1>
         </div>
         <div className="account">
           <span>{roles[auth.profile?.role] || 'RRHH'}</span>
@@ -230,8 +270,8 @@ function Dashboard({ auth }) {
           <form className="panel" onSubmit={createApplication}>
             <div className="section-head">
               <div>
-                <h2>Nueva aplicacion</h2>
-                <p>RRHH selecciona exactamente los examenes disponibles para el link.</p>
+                <h2>Nueva aplicación</h2>
+                <p>RRHH selecciona exactamente los exámenes disponibles para el link.</p>
               </div>
             </div>
             <div className="form-grid">
@@ -299,14 +339,14 @@ function ApplicationTable({ apps, onArchive, onRestore, onDelete }) {
                   <td className="actions">
                     <a href={publicLink(`/apply/${app.token}`)} target="_blank" rel="noreferrer">Link</a>
                     <a href={publicLink(`/results/${app.token}`)} target="_blank" rel="noreferrer">Resultado</a>
-                    <a href={publicLink(`/review/${app.token}`)} target="_blank" rel="noreferrer">Revision</a>
+                    <a href={publicLink(`/review/${app.token}`)} target="_blank" rel="noreferrer">Revisión</a>
                     {app.status === 'archived' ? <button onClick={() => onRestore(app.id)}>Restaurar</button> : <button onClick={() => onArchive(app.id)}>Archivar</button>}
                     <button className="danger" onClick={() => onDelete(app.id)}>Eliminar</button>
                   </td>
                 </tr>
               )
             })}
-            {!apps.length && <tr><td colSpan="5" className="empty">Sin aplicaciones todavia.</td></tr>}
+            {!apps.length && <tr><td colSpan="5" className="empty">Sin aplicaciones todavía.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -325,7 +365,7 @@ function TestsPanel({ tests }) {
             <p>{test.description}</p>
           </div>
           <dl>
-            <div><dt>Categoria</dt><dd>{test.category}</dd></div>
+            <div><dt>Categoría</dt><dd>{test.category}</dd></div>
             <div><dt>Reactivos</dt><dd>{test.questionCount || test.questions?.length || 'Pendiente'}</dd></div>
             <div><dt>Fuente</dt><dd>{test.source || 'Base de datos'}</dd></div>
           </dl>
@@ -410,10 +450,10 @@ function Apply() {
     setSubmitting(false)
   }
 
-  if (state.loading) return <Shell center><Loader text="Cargando evaluacion..." /></Shell>
-  if (!state.application) return <Shell center><Message title="Link invalido" text="No encontramos una aplicacion vigente con este token." /></Shell>
-  if (allDone) return <Shell center><Message title="Evaluacion completada" text={`Gracias ${state.application.candidate_name}. RRHH ya puede revisar tus resultados.`} /></Shell>
-  if (!test?.questions?.length) return <Shell center><Message title="Evaluacion no disponible" text="El link existe, pero la prueba asignada aun no tiene reactivos configurados." /></Shell>
+  if (state.loading) return <Shell center><Loader text="Cargando evaluación..." /></Shell>
+  if (!state.application) return <Shell center><Message title="Link inválido" text="No encontramos una aplicación vigente con este token." /></Shell>
+  if (allDone) return <Shell center><Message title="Evaluación completada" text={`Gracias ${state.application.candidate_name}. RRHH ya puede revisar tus resultados.`} /></Shell>
+  if (!test?.questions?.length) return <Shell center><Message title="Evaluación no disponible" text="El link existe, pero la prueba asignada aún no tiene reactivos configurados." /></Shell>
 
   return (
     <Shell narrow>
@@ -532,7 +572,7 @@ function Results({ review }) {
     <Shell narrow>
       <header className="candidate-head">
         <div>
-          <p className="eyebrow">{review ? 'Revision de respuestas' : 'Resultados'}</p>
+          <p className="eyebrow">{review ? 'Revisión de respuestas' : 'Resultados'}</p>
           <h1>{state.application.candidate_name}</h1>
           <p className="muted">Puesto: {state.application.position}</p>
         </div>
@@ -617,7 +657,7 @@ function formatAnswer(question, selected) {
 function buildInterpretation(test, score) {
   if (test.code !== 'moss') return score.message || 'Resultado capturado para revision de RRHH.'
   const level = resultLevel(score.total).label.toLowerCase()
-  return `Resultado ${level} en Test de Moss (${score.total}%). Revise las areas especificas para decidir entrevista, referencias y ajuste al puesto.`
+  return `Resultado ${level} en Test de Moss (${score.total}%). Revise las áreas específicas para decidir entrevista, referencias y ajuste al puesto.`
 }
 
 function Shell({ children, center, narrow }) {
