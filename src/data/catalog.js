@@ -1,4 +1,5 @@
 import { mossAreas, mossKey, mossQuestions } from './moss'
+import { leader360Areas, leader360Questions, pf16Questions, zavicAreas, zavicQuestions } from './psychometrics'
 
 export const localTests = [
   {
@@ -18,34 +19,41 @@ export const localTests = [
     code: '16pf-102',
     name: '16 PF 102 items',
     category: 'Personalidad',
-    description: 'Catalogado desde Recursos/examen dos. Listo para cargar reactivos, claves y baremos.',
+    description: 'Cuestionario de 102 reactivos capturado desde Recursos/examen dos.',
     durationMinutes: 45,
     questionCount: 102,
-    status: 'draft',
-    source: 'Recursos/examen dos',
-    questions: [],
+    status: 'active',
+    source: 'Recursos/examen dos/16 PF CUESTINARIO DE PERSONALIDAD 102 ITEMS.doc',
+    questions: pf16Questions,
+    areas: {
+      A: { name: 'Respuestas A' },
+      B: { name: 'Respuestas B' },
+      C: { name: 'Respuestas C' },
+    },
   },
   {
     code: 'zavic',
     name: 'Zavic',
     category: 'Valores e intereses',
-    description: 'Catalogado desde Recursos/examen tres. Pendiente de captura estructurada de cuadernillo e interpretacion.',
+    description: 'Ranking de valores e intereses capturado desde Recursos/examen tres.',
     durationMinutes: 25,
-    questionCount: 0,
-    status: 'draft',
-    source: 'Recursos/examen tres',
-    questions: [],
+    questionCount: 20,
+    status: 'active',
+    source: 'Recursos/examen tres/Cuadernillo.doc y zavicinterpreta.doc',
+    questions: zavicQuestions,
+    areas: zavicAreas,
   },
   {
     code: '360-lider',
     name: 'Evaluacion 360 lider',
     category: 'Desempeno',
-    description: 'Catalogado desde Recursos/un examen. Pensado para evaluadores multiples y reporte consolidado.',
+    description: 'Evaluacion 360 a lideres en escala 0 a 10 capturada desde Recursos/un examen.',
     durationMinutes: 30,
-    questionCount: 0,
-    status: 'draft',
-    source: 'Recursos/un examen',
-    questions: [],
+    questionCount: 40,
+    status: 'active',
+    source: 'Recursos/un examen/evaluacion-de 360 desempeño-lider.xls',
+    questions: leader360Questions,
+    areas: leader360Areas,
   },
 ]
 
@@ -55,14 +63,15 @@ export function getLocalTest(code) {
 
 export function normalizeTest(row) {
   const fallback = getLocalTest(row?.code)
+  const useFallbackQuestions = !row?.questions?.length && fallback?.questions?.length
   return {
     ...fallback,
     ...row,
     durationMinutes: row?.duration_minutes ?? fallback?.durationMinutes ?? 0,
-    questionCount: row?.question_count ?? fallback?.questionCount ?? row?.questions?.length ?? 0,
-    questions: row?.questions?.length ? row.questions : fallback?.questions ?? [],
+    questionCount: useFallbackQuestions ? fallback.questionCount : row?.question_count ?? fallback?.questionCount ?? row?.questions?.length ?? 0,
+    questions: useFallbackQuestions ? fallback.questions : row?.questions?.length ? row.questions : [],
     key: row?.answer_key || fallback?.key || {},
     areas: row?.areas || fallback?.areas || {},
-    status: row?.status || fallback?.status || 'draft',
+    status: useFallbackQuestions ? fallback.status : row?.status || fallback?.status || 'draft',
   }
 }

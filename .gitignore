@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+Nuevo Documento de texto.txt
+tmp_extract/
 
 # Editor directories and files
 .vscode/*

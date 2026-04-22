@@ -381,7 +381,8 @@ function Apply() {
   const test = current?.test
   const pendingItems = state.items.filter((item) => item.status !== 'completed')
   const currentAnswers = answers[current?.id] || {}
-  const progress = test?.questions?.length ? Object.keys(currentAnswers).length / test.questions.length : 0
+  const answeredCount = test?.questions?.filter((question) => isAnswered(question, currentAnswers[String(question.n)])).length || 0
+  const progress = test?.questions?.length ? answeredCount / test.questions.length : 0
   const allDone = state.items.length > 0 && pendingItems.length === 0
 
   async function submitCurrent() {
@@ -436,13 +437,61 @@ function Apply() {
         ))}
       </div>
       <button className="submit-test" disabled={submitting || progress < 1} onClick={submitCurrent}>
-        {progress < 1 ? `Faltan ${test.questions.length - Object.keys(currentAnswers).length} respuestas` : submitting ? 'Guardando...' : 'Enviar prueba'}
+        {progress < 1 ? `Faltan ${test.questions.length - answeredCount} respuestas` : submitting ? 'Guardando...' : 'Enviar prueba'}
       </button>
     </Shell>
   )
 }
 
+function isAnswered(question, value) {
+  if (question.type === 'ranking') {
+    const values = Object.values(value || {}).map(Number)
+    return values.length === question.options.length && new Set(values).size === question.options.length && values.every((item) => item >= 1 && item <= question.options.length)
+  }
+  if (question.type === 'rating') return value !== undefined && value !== null && value !== ''
+  return Boolean(value)
+}
+
 function Question({ question, value, onChange }) {
+  if (question.type === 'ranking') {
+    const selected = value || {}
+    const ranks = Array.from({ length: question.options.length }, (_, index) => index + 1)
+    return (
+      <article className="question">
+        <p><span>{question.n}.</span>{question.text}</p>
+        <div className="ranking-options">
+          {question.options.map((option, index) => {
+            const letter = ['a', 'b', 'c', 'd'][index]
+            return (
+              <label key={letter}>
+                <b>{letter})</b>
+                <span>{option.text || option}</span>
+                <select value={selected[letter] || ''} onChange={(event) => onChange({ ...selected, [letter]: Number(event.target.value) })}>
+                  <option value="">Orden</option>
+                  {ranks.map((rank) => <option key={rank} value={rank}>{rank}</option>)}
+                </select>
+              </label>
+            )
+          })}
+        </div>
+      </article>
+    )
+  }
+
+  if (question.type === 'rating') {
+    return (
+      <article className="question rating-question">
+        <p><span>{question.n}.</span>{question.text}</p>
+        <input type="range" min={question.min ?? 0} max={question.max ?? 10} step="1" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value))} />
+        <div className="rating-row">
+          <span>0</span>
+          <strong>{value ?? 0}</strong>
+          <span>10</span>
+        </div>
+      </article>
+    )
+  }
+
   return (
     <article className="question">
       <p><span>{question.n}.</span>{question.text}</p>
@@ -547,13 +596,22 @@ function AnswerReview({ test, answers }) {
         return (
           <div key={question.n}>
             <strong>{question.n}</strong>
-            <span>{selected || '-'}</span>
+            <span>{formatAnswer(question, selected)}</span>
             {correct && <em className={selected === correct ? 'ok' : 'bad'}>{correct}</em>}
           </div>
         )
       })}
     </div>
   )
+}
+
+function formatAnswer(question, selected) {
+  if (!selected && selected !== 0) return '-'
+  if (question.type === 'ranking') {
+    return ['a', 'b', 'c', 'd'].map((letter) => `${letter}:${selected[letter] || '-'}`).join(' ')
+  }
+  if (question.type === 'rating') return `${selected}/10`
+  return selected
 }
 
 function buildInterpretation(test, score) {
